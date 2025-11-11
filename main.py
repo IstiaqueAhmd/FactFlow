@@ -4,12 +4,11 @@ from typing import List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-
+from models import TextRequest, ResponseModel
+from factchecker import FactChecker
 
 #initialize components
-
-
-
+fact_checker = FactChecker()
 
 #initialize FastAPI app
 app = FastAPI(
@@ -33,13 +32,44 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok", "timestamp": datetime.utcnow()} 
 
+
+@app.post("/check-text", response_model=ResponseModel)
+async def text_check(request: TextRequest):
+    """
+    Check the factuality of a given text.
+    
+    Args:
+        request: CheckTextRequest containing the text to fact-check
+        
+    Returns:
+        CheckResponse with summary and sources
+    """
+    try:
+        if not request.text or not request.text.strip():
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+        
+        # Use FactChecker to analyze the text
+        result = fact_checker.check_text(request.text)
+        
+        # Parse the result into CheckResponse format
+        # Assuming the FactChecker returns a model with summary and sources
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
+
+
+
 @app.post("/check-image")
 async def image_check():
     return {"status": "ok", "timestamp": datetime.utcnow()} 
 
-@app.post("/check-text")
-async def text_check():
+
+@app.post("/check-image")
+async def image_check():
     return {"status": "ok", "timestamp": datetime.utcnow()} 
+
 
 @app.post("/check-url")
 async def url_check():
