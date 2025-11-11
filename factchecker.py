@@ -9,20 +9,19 @@ from models import CheckResponse, Source
 
 load_dotenv()
 
-
 class FactChecker:
     def __init__(self):
         """Initialize the FactChecker with OpenAI and Tavily clients."""
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
         
-        # Define the tool for function calling
+        # Define tool schema for function calling
         self.tools = [
             {
                 "type": "function",
                 "function": {
                     "name": "search_web",
-                    "description": "Search the web for current information to verify facts. Use this when you need to check claims against real-world data.",
+                    "description": "Search the web for current information to verify facts.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -38,22 +37,13 @@ class FactChecker:
         ]
 
     def search_web(self, query: str) -> Dict:
-        """
-        Search the web using Tavily API.
-        
-        Args:
-            query: The search query string
-            
-        Returns:
-            Dictionary containing search results with titles, URLs, and content
-        """
+        """Perform web search using Tavily API."""
         try:
             response = self.tavily_client.search(
                 query=query,
                 search_depth="advanced",
                 max_results=5
             )
-            
             return {
                 "results": response.get("results", []),
                 "answer": response.get("answer", "")
@@ -63,75 +53,56 @@ class FactChecker:
             return {"results": [], "answer": "", "error": str(e)}
 
     def check_text(self, text: str) -> CheckResponse:
-        """
-        Check the factual accuracy of the provided text using AI and web search.
-        
-        Args:
-            text: The text claim to fact-check
-            
-        Returns:
-            CheckResponse object with verdict, confidence, summary, reasoning, and sources
-        """
+        """Verify factual accuracy of the text using AI + web search."""
         try:
-            # Initial conversation with the AI
             messages = [
                 {
                     "role": "system",
-                    "content": """You are an expert fact-checker. Your job is to verify claims using web searches.
-                    
-When analyzing a claim:
-1. Use the search_web function to find current, reliable information
-2. Evaluate multiple sources before making a determination
-3. Provide a verdict: TRUE, FALSE, UNVERIFIABLE, or ERROR
-4. Give a confidence score (0.0 to 1.0) based on evidence quality
-5. Write a clear summary and detailed reasoning
-6. Always cite your sources
-
-Be thorough and objective."""
+                    "content": """You are an expert fact-checker. 
+                    1. Use the search_web tool when you need to verify claims. 
+                    2. Evaluate multiple sources. 
+                    3. Give a verdict (TRUE, FALSE, UNVERIFIABLE, ERROR). 
+                    4. Confidence (0.0–1.0). 
+                    5. Write a summary, reasoning, and cite sources."""
                 },
                 {
                     "role": "user",
-                    "content": f"Please fact-check the following claim:\n\n\"{text}\"\n\nUse web search to find current information and provide a detailed fact-check."
+                    "content": f"Fact-check this claim:\n\n\"{text}\""
                 }
             ]
             
-            # First API call - AI will likely request a function call
             response = self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model="gpt-4.1",
                 messages=messages,
                 tools=self.tools,
                 tool_choice="auto"
             )
-            
+
             response_message = response.choices[0].message
             messages.append(response_message)
             
-            # Handle function calls
+            # Handle tool calls
             search_results_data = []
-            while response_message.tool_calls:
+            while getattr(response_message, "tool_calls", None):
                 for tool_call in response_message.tool_calls:
                     if tool_call.function.name == "search_web":
-                        # Execute the web search
-                        function_args = json.loads(tool_call.function.arguments)
-                        search_query = function_args.get("query")
+                        args = json.loads(tool_call.function.arguments)
+                        query = args.get("query")
+                        print(f"🔍 Searching web for: {query}")
                         
-                        print(f"Searching web for: {search_query}")
-                        search_results = self.search_web(search_query)
-                        search_results_data.append(search_results)
+                        results = self.search_web(query)
+                        search_results_data.append(results)
                         
-                        # Add function response to messages
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tool_call.id,
-                                "name": tool_call.function.name,
-                                "content": json.dumps(search_results)
-                            }
-                        )
-                
-                # Get next response from AI
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "name": tool_call.function.name,
+                            "content": json.dumps(results)
+                        })
+
+                # Ask model to process tool output
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
+                    model="gpt-4.1",
                     messages=messages,
                     tools=self.tools,
                     tool_choice="auto"
@@ -139,37 +110,26 @@ Be thorough and objective."""
                 response_message = response.choices[0].message
                 messages.append(response_message)
             
-            # Final response with structured output
-            final_prompt = f"""Based on the search results, provide a structured fact-check in JSON format with these exact keys:
-- "verdict": one of "TRUE", "FALSE", "UNVERIFIABLE", or "ERROR"
-- "confidence": a number between 0.0 and 1.0
-- "summary": a brief summary (1-2 sentences)
-- "reasoning": detailed reasoning explaining your verdict
-- "sources": array of objects with "title" and "url" keys
-
-Return ONLY the JSON object, no other text."""
+            # Final structured JSON output
+            final_prompt = """Now summarize your findings in JSON with:
+            - verdict: TRUE, FALSE, UNVERIFIABLE, or ERROR
+            - confidence: number 0.0–1.0
+            - summary: 1–2 sentences
+            - reasoning: detailed explanation
+            - sources: [{title, url}]"""
             
             messages.append({"role": "user", "content": final_prompt})
             
             final_response = self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=messages,
-                response_format={"type": "json_object"}
+                model="gpt-4.1",
+                messages=messages
             )
             
-            result_text = final_response.choices[0].message.content
-            result_data = json.loads(result_text)
+            result_data = json.loads(final_response.choices[0].message.content)
             
-            # Parse sources
-            sources = []
-            for source in result_data.get("sources", []):
-                sources.append(Source(
-                    title=source.get("title", "Unknown"),
-                    url=source.get("url", "")
-                ))
+            sources = [Source(title=s.get("title", ""), url=s.get("url", "")) for s in result_data.get("sources", [])]
             
-            # Create CheckResponse object
-            check_response = CheckResponse(
+            return CheckResponse(
                 verdict=result_data.get("verdict", "ERROR"),
                 confidence=float(result_data.get("confidence", 0.0)),
                 summary=result_data.get("summary", "Unable to verify"),
@@ -177,18 +137,14 @@ Return ONLY the JSON object, no other text."""
                 sources=sources,
                 timestamp=datetime.utcnow()
             )
-            
-            return check_response
-            
+
         except Exception as e:
             print(f"Error in fact-checking: {str(e)}")
-            # Return error response
             return CheckResponse(
                 verdict="ERROR",
                 confidence=0.0,
-                summary=f"An error occurred during fact-checking: {str(e)}",
+                summary=f"Error during fact-checking: {str(e)}",
                 reasoning="",
                 sources=[],
                 timestamp=datetime.utcnow()
             )
-
