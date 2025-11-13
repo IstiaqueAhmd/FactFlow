@@ -315,3 +315,7 @@ class FactChecker:
                 sources=[],
                 timestamp=datetime.utcnow()
             )
+
+    def check_url(self, url: str) -> CheckResponse:
+        pass
+    
