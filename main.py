@@ -31,7 +31,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -49,15 +48,7 @@ async def health_check():
 
 @app.post("/check-text", response_model=ResponseModel)
 async def upload_text(request: TextRequest):
-    """
-    Check the factuality of a given text.
-    
-    Args:
-        request: CheckTextRequest containing the text to fact-check
-        
-    Returns:
-        CheckResponse with summary and sources
-    """
+    """Fact-check the provided text."""
     try:
         if not request.text or not request.text.strip():
             raise HTTPException(status_code=400, detail="Text cannot be empty")
@@ -65,14 +56,11 @@ async def upload_text(request: TextRequest):
         # Use FactChecker to analyze the text
         result = fact_checker.check_text(request.text)
         
-        # Parse the result into CheckResponse format
-        # Assuming the FactChecker returns a model with summary and sources
         return result
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
-
 
 
 @app.post("/check-image", response_model=ResponseModel)
@@ -120,6 +108,7 @@ async def upload_image(file: Annotated[UploadFile, File(description="The image f
             detail=f"Error fact-checking image: {str(e)}"
         )
 
+
 @app.post("/check-pdf", response_model=ResponseModel)
 async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file to upload.")]):
     """
@@ -166,10 +155,21 @@ async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file 
         )
 
 
-@app.post("/check-url")
+@app.post("/check-url", response_model=ResponseModel)
 async def upload_url(url: str):
-    pass
-
+    """Fact-check the content of a given URL."""
+    try:
+        if not url:
+            raise HTTPException(status_code=400, detail="Url cannot be empty")
+        
+        # Use FactChecker to analyze the text
+        result = fact_checker.check_url(url)
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
 
 
 if __name__ == "__main__":
