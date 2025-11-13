@@ -11,6 +11,11 @@ from factchecker import FactChecker
 
 # Define the directory to store uploaded files
 UPLOADS_PDF_DIR = "PDF_Uploads"
+UPLOADS_IMG_DIR = "Image_Uploads"
+
+# Define allowed image types
+ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+
 
 # Create the uploads directory if it doesn't already exist
 os.makedirs(UPLOADS_PDF_DIR, exist_ok=True)
@@ -42,7 +47,7 @@ async def health_check():
 
 
 @app.post("/check-text", response_model=ResponseModel)
-async def text_check(request: TextRequest):
+async def upload_text(request: TextRequest):
     """
     Check the factuality of a given text.
     
@@ -70,12 +75,49 @@ async def text_check(request: TextRequest):
 
 
 @app.post("/check-image")
-async def image_check():
-    return {"status": "ok", "timestamp": datetime.utcnow()} 
+async def upload_image(file: Annotated[UploadFile, File(description="The image file to upload (JPEG, PNG, GIF, WebP).")]):
+    """
+    Uploads an image file and saves it to the 'uploads' directory.
 
+    - **Validates** if the uploaded file is an allowed image type.
+    - **Saves** the file to the server.
+    - **Returns** a confirmation message upon success.
+    """
+
+    # 1. Validate the file's content type
+    if file.content_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,  # 400 Bad Request
+            detail=f"Invalid file type. Allowed types are: {', '.join(ALLOWED_IMAGE_MIME_TYPES)}"
+        )
+
+    # 2. Define the full path to save the file
+    file_path = os.path.join(UPLOADS_IMG_DIR, file.filename)
+
+    # 3. Save the file to the directory
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+    except Exception as e:
+        # Handle potential file-saving errors
+        raise HTTPException(
+            status_code=500,  # 500 Internal Server Error
+            detail=f"There was an error saving the file: {e}"
+        )
+    finally:
+        # Always close the uploaded file
+        await file.close()
+
+    # 4. Return a success response
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "message": f"File '{file.filename}' was successfully uploaded to {file_path}."
+    }
 
 @app.post("/check-pdf")
-async def check_pdf(file: Annotated[UploadFile, File(description="The PDF file to upload.")]):
+async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file to upload.")]):
     """
     Uploads a PDF file and saves it to the 'uploads' directory.
 
@@ -123,8 +165,9 @@ async def check_pdf(file: Annotated[UploadFile, File(description="The PDF file t
 
 
 @app.post("/check-url")
-async def url_check():
-    return {"status": "ok", "timestamp": datetime.utcnow()} 
+async def upload_url(url: str):
+    pass
+
 
 
 if __name__ == "__main__":
