@@ -6,7 +6,6 @@ __pycache__/
 #assets
 PDF_Uploads/
 Image_Uploads/
-.env/
 # C extensions
 *.so
 
