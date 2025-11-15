@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
-
+from database import Database
 from models import TextRequest, ResponseModel
 from factchecker import FactChecker
 
@@ -16,13 +16,22 @@ UPLOADS_IMG_DIR = "Image_Uploads"
 # Define allowed image types
 ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
 
-
 # Create the uploads directories if they don't already exist
 os.makedirs(UPLOADS_PDF_DIR, exist_ok=True)
 os.makedirs(UPLOADS_IMG_DIR, exist_ok=True)
 
 #initialize components
 fact_checker = FactChecker()
+database = Database()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler"""
+    # Startup
+    database.init_db()
+    yield
+    # Shutdown (if needed)
+    database.disconnect()
 
 #initialize FastAPI app
 app = FastAPI(
@@ -56,7 +65,22 @@ async def upload_text(request: TextRequest):
         # Use FactChecker to analyze the text
         result = fact_checker.check_text(request.text)
         
-        return result
+        # Save to database
+        database.save_fact_check(request.user_id, result)
+        
+        # Return response with user_id
+        response = ResponseModel(
+            user_id=request.user_id,
+            verdict=result.verdict,
+            confidence=result.confidence,
+            claim=result.claim,
+            conclusion=result.conclusion,
+            evidence=result.evidence,
+            sources=result.sources,
+            timestamp=result.timestamp
+        )
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:
@@ -64,7 +88,10 @@ async def upload_text(request: TextRequest):
 
 
 @app.post("/check-image", response_model=ResponseModel)
-async def upload_image(file: Annotated[UploadFile, File(description="The image file to upload (JPEG, PNG, GIF, WebP).")]):
+async def upload_image(
+    file: Annotated[UploadFile, File(description="The image file to upload (JPEG, PNG, GIF, WebP).")],
+    user_id: str
+):
     """
     Upload an image file and fact-check the text extracted from it.
 
@@ -101,7 +128,23 @@ async def upload_image(file: Annotated[UploadFile, File(description="The image f
     # 4. Fact-check the image
     try:
         result = fact_checker.check_image(file_path)
-        return result
+        
+        # Save to database
+        database.save_fact_check(user_id, result)
+        
+        # Return response with user_id
+        response = ResponseModel(
+            user_id=user_id,
+            verdict=result.verdict,
+            confidence=result.confidence,
+            claim=result.claim,
+            conclusion=result.conclusion,
+            evidence=result.evidence,
+            sources=result.sources,
+            timestamp=result.timestamp
+        )
+        
+        return response
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -110,7 +153,10 @@ async def upload_image(file: Annotated[UploadFile, File(description="The image f
 
 
 @app.post("/check-pdf", response_model=ResponseModel)
-async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file to upload.")]):
+async def upload_pdf(
+    file: Annotated[UploadFile, File(description="The PDF file to upload.")],
+    user_id: str
+):
     """
     Upload a PDF file and fact-check the text extracted from it.
 
@@ -147,7 +193,23 @@ async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file 
     # 4. Fact-check the PDF
     try:
         result = fact_checker.check_pdf(file_path)
-        return result
+        
+        # Save to database
+        database.save_fact_check(user_id, result)
+        
+        # Return response with user_id
+        response = ResponseModel(
+            user_id=user_id,
+            verdict=result.verdict,
+            confidence=result.confidence,
+            claim=result.claim,
+            conclusion=result.conclusion,
+            evidence=result.evidence,
+            sources=result.sources,
+            timestamp=result.timestamp
+        )
+        
+        return response
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -156,7 +218,7 @@ async def upload_pdf(file: Annotated[UploadFile, File(description="The PDF file 
 
 
 @app.post("/check-url", response_model=ResponseModel)
-async def upload_url(url: str):
+async def upload_url(url: str, user_id: str):
     """Fact-check the content of a given URL."""
     try:
         if not url:
@@ -165,7 +227,22 @@ async def upload_url(url: str):
         # Use FactChecker to analyze the text
         result = fact_checker.check_url(url)
         
-        return result
+        # Save to database
+        database.save_fact_check(user_id, result)
+        
+        # Return response with user_id
+        response = ResponseModel(
+            user_id=user_id,
+            verdict=result.verdict,
+            confidence=result.confidence,
+            claim=result.claim,
+            conclusion=result.conclusion,
+            evidence=result.evidence,
+            sources=result.sources,
+            timestamp=result.timestamp
+        )
+        
+        return response
     except HTTPException:
         raise
     except Exception as e:
