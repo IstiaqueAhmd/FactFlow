@@ -185,3 +185,4 @@ logs/
 tmp/
 temp/
 .env
+app/__init__.py
