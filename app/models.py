@@ -14,8 +14,9 @@ class Source(BaseModel):
 class CheckResponse(BaseModel):
     verdict: str
     confidence: float
-    summary: str
-    reasoning: str
+    claim: str
+    conclusion: str
+    evidence: Dict[str, List[str]]
     sources: List[Source]
     timestamp: datetime
 
