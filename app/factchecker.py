@@ -60,12 +60,16 @@ class FactChecker:
             messages = [
                 {
                     "role": "system",
-                    "content": """You are an expert fact-checker. 
+                    "content": f"""You are an expert fact-checker. 
                     1. Use the search_web tool when you need to verify claims. 
                     2. Evaluate multiple sources. 
                     3. Give a verdict (TRUE, FALSE, UNVERIFIABLE, ERROR). 
-                    4. Confidence (0.0–1.0). 
-                    5. Write a summary, reasoning, and cite sources."""
+                    4. Confidence (0.0–1.0).
+                    5. Claim summary.
+                    6. A brief Conclusion.
+                    7. Evidence-based reasoning (Supporting and Counter Evidence).
+                    7. Cite the sources.
+                    8. Todays date is {datetime.utcnow().date()}"."""
                 },
                 {
                     "role": "user",
@@ -116,9 +120,11 @@ class FactChecker:
             final_prompt = """Now summarize your findings in JSON with:
             - verdict: TRUE, FALSE, UNVERIFIABLE, or ERROR
             - confidence: number 0.0–1.0
-            - summary: 1–2 sentences
+            - claim: the main claim being checked 
+            - conclusion: 1–2 sentences
             - reasoning: detailed explanation
-            - sources: [{title, url}]"""
+            - evidence: {supporting: [], counter: [optional]} 
+            - citations: [{title, url}]"""
             
             messages.append({"role": "user", "content": final_prompt})
             
@@ -129,13 +135,14 @@ class FactChecker:
             
             result_data = json.loads(final_response.choices[0].message.content)
             
-            sources = [Source(title=s.get("title", ""), url=s.get("url", "")) for s in result_data.get("sources", [])]
+            sources = [Source(title=s.get("title", ""), url=s.get("url", "")) for s in result_data.get("sources", result_data.get("citations", []))]
             
             return CheckResponse(
                 verdict=result_data.get("verdict", "ERROR"),
                 confidence=float(result_data.get("confidence", 0.0)),
-                summary=result_data.get("summary", "Unable to verify"),
-                reasoning=result_data.get("reasoning", ""),
+                claim=result_data.get("claim", ""),
+                conclusion=result_data.get("conclusion", "Unable to verify"),
+                evidence=result_data.get("evidence", {"supporting": [], "counter": []}),
                 sources=sources,
                 timestamp=datetime.utcnow()
             )
@@ -145,8 +152,9 @@ class FactChecker:
             return CheckResponse(
                 verdict="ERROR",
                 confidence=0.0,
-                summary=f"Error during fact-checking: {str(e)}",
-                reasoning="",
+                claim="",
+                conclusion=f"Error during fact-checking: {str(e)}",
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
@@ -258,8 +266,9 @@ class FactChecker:
                 return CheckResponse(
                     verdict="UNVERIFIABLE",
                     confidence=0.0,
-                    summary="No text found in the image to fact-check.",
-                    reasoning="",
+                    claim="",
+                    conclusion="No text found in the image to fact-check.",
+                    evidence={"supporting": [], "counter": []},
                     sources=[],
                     timestamp=datetime.utcnow()
                 )
@@ -272,8 +281,9 @@ class FactChecker:
             return CheckResponse(
                 verdict="ERROR",
                 confidence=0.0,
-                summary=f"Error processing image: {str(e)}",
-                reasoning="",
+                claim="",
+                conclusion=f"Error processing image: {str(e)}",
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
@@ -296,8 +306,9 @@ class FactChecker:
                 return CheckResponse(
                     verdict="UNVERIFIABLE",
                     confidence=0.0,
-                    summary="No text found in the PDF to fact-check.",
-                    reasoning="",
+                    claim="",
+                    conclusion="No text found in the PDF to fact-check.",
+                    evidence={"supporting": [], "counter": []},
                     sources=[],
                     timestamp=datetime.utcnow()
                 )
@@ -310,8 +321,9 @@ class FactChecker:
             return CheckResponse(
                 verdict="ERROR",
                 confidence=0.0,
-                summary=f"Error processing PDF: {str(e)}",
-                reasoning="",
+                claim="",
+                conclusion=f"Error processing PDF: {str(e)}",
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
