@@ -6,7 +6,7 @@ from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel
+from models import TextRequest, ResponseModel, Source
 from factchecker import FactChecker
 
 # Define the directory to store uploaded files
@@ -38,6 +38,7 @@ app = FastAPI(
     title="FactFlow API",
     description="API for FactFlow - A Fact-Checking Application",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -247,6 +248,28 @@ async def upload_url(url: str, user_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
+
+@app.get("/get-results", response_model=List[ResponseModel])
+async def get_results(user_id: str, limit: Optional[int] = 10):
+    """Retrieve past fact-check results for a given user."""
+    try:
+        results = database.get_fact_checks(user_id, limit)
+        response = [
+            ResponseModel(
+                user_id=res["user_id"],
+                verdict=res["verdict"],
+                confidence=res["confidence"],
+                claim=res["claim"],
+                conclusion=res["conclusion"],
+                evidence=res["evidence"],
+                sources=[Source(**source) for source in res["sources"]],
+                timestamp=res["timestamp"]
+            ) for res in results
+        ]
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving results: {str(e)}")
+
 
 
 if __name__ == "__main__":
