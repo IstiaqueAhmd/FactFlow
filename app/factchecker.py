@@ -5,7 +5,7 @@ import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
-from models import CheckResponse, Source, Evidence
+from models import CheckResponse, Source
 import base64
 import PyPDF2
 
@@ -116,23 +116,36 @@ class FactChecker:
                 response_message = response.choices[0].message
                 messages.append(response_message)
             
-            # Final structured JSON output using OpenAI's Structured Outputs
-            final_prompt = """Now summarize your findings based on the search results. 
-            Provide a verdict (TRUE, FALSE, UNVERIFIABLE, or ERROR), confidence score, 
-            the main claim being checked, a brief conclusion, detailed reasoning as evidence, 
-            and citations."""
+            # Final structured JSON output
+            final_prompt = """Now summarize your findings in JSON with:
+            - verdict: TRUE, FALSE, UNVERIFIABLE, or ERROR
+            - confidence: number 0.0–1.0
+            - claim: the main claim being checked 
+            - conclusion: 1–2 sentences
+            - reasoning: detailed explanation
+            - evidence: {supporting: [], counter: [optional]} 
+            - citations: [{title, url}]"""
             
             messages.append({"role": "user", "content": final_prompt})
             
-            # Use structured outputs with response_format
-            final_response = self.openai_client.responses.parse(
-                model="gpt-4.1-mini",
-                input=messages,
-                response_format=CheckResponse
+            final_response = self.openai_client.chat.completions.create(
+                model="gpt-4.1",
+                messages=messages
             )
             
-            # Get the parsed response directly
-            return final_response.output_parsed
+            result_data = json.loads(final_response.choices[0].message.content)
+            
+            sources = [Source(title=s.get("title", ""), url=s.get("url", "")) for s in result_data.get("sources", result_data.get("citations", []))]
+            
+            return CheckResponse(
+                verdict=result_data.get("verdict", "ERROR"),
+                confidence=float(result_data.get("confidence", 0.0)),
+                claim=result_data.get("claim", ""),
+                conclusion=result_data.get("conclusion", "Unable to verify"),
+                evidence=result_data.get("evidence", {"supporting": [], "counter": []}),
+                sources=sources,
+                timestamp=datetime.utcnow()
+            )
 
         except Exception as e:
             print(f"Error in fact-checking: {str(e)}")
@@ -141,7 +154,7 @@ class FactChecker:
                 confidence=0.0,
                 claim="",
                 conclusion=f"Error during fact-checking: {str(e)}",
-                evidence=Evidence(supporting=[], counter=[]),
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
@@ -255,7 +268,7 @@ class FactChecker:
                     confidence=0.0,
                     claim="",
                     conclusion="No text found in the image to fact-check.",
-                    evidence=Evidence(supporting=[], counter=[]),
+                    evidence={"supporting": [], "counter": []},
                     sources=[],
                     timestamp=datetime.utcnow()
                 )
@@ -270,7 +283,7 @@ class FactChecker:
                 confidence=0.0,
                 claim="",
                 conclusion=f"Error processing image: {str(e)}",
-                evidence=Evidence(supporting=[], counter=[]),
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
@@ -295,7 +308,7 @@ class FactChecker:
                     confidence=0.0,
                     claim="",
                     conclusion="No text found in the PDF to fact-check.",
-                    evidence=Evidence(supporting=[], counter=[]),
+                    evidence={"supporting": [], "counter": []},
                     sources=[],
                     timestamp=datetime.utcnow()
                 )
@@ -310,7 +323,7 @@ class FactChecker:
                 confidence=0.0,
                 claim="",
                 conclusion=f"Error processing PDF: {str(e)}",
-                evidence=Evidence(supporting=[], counter=[]),
+                evidence={"supporting": [], "counter": []},
                 sources=[],
                 timestamp=datetime.utcnow()
             )
@@ -338,7 +351,7 @@ class FactChecker:
                     confidence=0.0,
                     claim="",
                     conclusion="Unable to fetch content from the provided URL.",
-                    evidence=Evidence(supporting=[], counter=[]),
+                    evidence={"supporting": [], "counter": []},
                     sources=[Source(title="Source URL", url=url)],
                     timestamp=datetime.utcnow()
                 )
@@ -352,7 +365,7 @@ class FactChecker:
                     confidence=0.0,
                     claim="",
                     conclusion="No text content found at the URL to fact-check.",
-                    evidence=Evidence(supporting=[], counter=[]),
+                    evidence={"supporting": [], "counter": []},
                     sources=[Source(title="Source URL", url=url)],
                     timestamp=datetime.utcnow()
                 )
@@ -369,7 +382,7 @@ class FactChecker:
                 confidence=0.0,
                 claim="",
                 conclusion=f"Error processing URL: {str(e)}",
-                evidence=Evidence(supporting=[], counter=[]),
+                evidence={"supporting": [], "counter": []},
                 sources=[Source(title="Source URL", url=url)],
                 timestamp=datetime.utcnow()
             )
