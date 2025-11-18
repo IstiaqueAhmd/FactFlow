@@ -329,5 +329,60 @@ class FactChecker:
             )
 
     def check_url(self, url: str) -> CheckResponse:
-        pass
-    
+        """
+        Fact-check content from a URL.
+        
+        Args:
+            url: URL of the webpage to fact-check
+            
+        Returns:
+            CheckResponse with fact-check verdict
+        """
+        try:
+            # Extract content from the URL using Tavily
+            print(f"🌐 Fetching content from URL: {url}")
+            
+            # Use Tavily to extract content from the URL
+            response = self.tavily_client.extract(urls=[url])
+            
+            if not response or not response.get("results"):
+                return CheckResponse(
+                    verdict="ERROR",
+                    confidence=0.0,
+                    claim="",
+                    conclusion="Unable to fetch content from the provided URL.",
+                    evidence={"supporting": [], "counter": []},
+                    sources=[Source(title="Source URL", url=url)],
+                    timestamp=datetime.utcnow()
+                )
+            
+            # Get the extracted content
+            extracted_content = response["results"][0].get("raw_content", "")
+            
+            if not extracted_content.strip():
+                return CheckResponse(
+                    verdict="UNVERIFIABLE",
+                    confidence=0.0,
+                    claim="",
+                    conclusion="No text content found at the URL to fact-check.",
+                    evidence={"supporting": [], "counter": []},
+                    sources=[Source(title="Source URL", url=url)],
+                    timestamp=datetime.utcnow()
+                )
+            
+            print(f"✅ Content extracted from URL: {extracted_content[:100]}...")
+            
+            # Fact-check the extracted content
+            return self.check_text(extracted_content)
+            
+        except Exception as e:
+            print(f"Error fact-checking URL: {str(e)}")
+            return CheckResponse(
+                verdict="ERROR",
+                confidence=0.0,
+                claim="",
+                conclusion=f"Error processing URL: {str(e)}",
+                evidence={"supporting": [], "counter": []},
+                sources=[Source(title="Source URL", url=url)],
+                timestamp=datetime.utcnow()
+            )
