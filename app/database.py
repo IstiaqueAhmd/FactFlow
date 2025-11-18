@@ -5,7 +5,7 @@ from datetime import datetime
 from bson import ObjectId
 import os
 from dotenv import load_dotenv
-from models import CheckResponse, Evidence
+from models import CheckResponse
 
 # Load environment variables
 load_dotenv()
@@ -77,7 +77,7 @@ class Database:
                 "confidence": check_result.confidence,
                 "claim": check_result.claim,
                 "conclusion": check_result.conclusion,
-                "evidence": check_result.evidence.model_dump() if hasattr(check_result.evidence, 'model_dump') else check_result.evidence,
+                "evidence": check_result.evidence,
                 "sources": [{"title": s.title, "url": s.url} for s in check_result.sources],
                 "timestamp": check_result.timestamp,
             }
