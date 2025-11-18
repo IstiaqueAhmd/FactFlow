@@ -6,7 +6,7 @@ from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel, Source, Evidence
+from models import TextRequest, ResponseModel, Source
 from factchecker import FactChecker
 
 # Define the directory to store uploaded files
@@ -38,7 +38,7 @@ app = FastAPI(
     title="FactFlow API",
     description="API for FactFlow - A Fact-Checking Application",
     version="1.0.0",
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -261,7 +261,7 @@ async def get_results(user_id: str, limit: Optional[int] = 10):
                 confidence=res["confidence"],
                 claim=res["claim"],
                 conclusion=res["conclusion"],
-                evidence=Evidence(**res["evidence"]) if isinstance(res["evidence"], dict) else res["evidence"],
+                evidence=res["evidence"],
                 sources=[Source(**source) for source in res["sources"]],
                 timestamp=res["timestamp"]
             ) for res in results
