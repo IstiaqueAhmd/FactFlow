@@ -6,7 +6,7 @@ from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel, Source
+from models import TextRequest, ResponseModel, Source, Evidence
 from factchecker import FactChecker
 
 # Define the directory to store uploaded files
@@ -261,7 +261,7 @@ async def get_results(user_id: str, limit: Optional[int] = 10):
                 confidence=res["confidence"],
                 claim=res["claim"],
                 conclusion=res["conclusion"],
-                evidence=res["evidence"],
+                evidence=Evidence(**res["evidence"]) if isinstance(res["evidence"], dict) else res["evidence"],
                 sources=[Source(**source) for source in res["sources"]],
                 timestamp=res["timestamp"]
             ) for res in results
