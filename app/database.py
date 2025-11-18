@@ -91,4 +91,29 @@ class Database:
         except Exception as e:
             print(f"Error saving fact check to database: {e}")
             raise
-    
+
+    def get_fact_checks(self, user_id: str, limit: Optional[int] = None) -> List[Dict]:
+        """
+        Retrieve past fact check results for a given user.
+        
+        Args:
+            user_id: The user ID whose results to retrieve
+            limit: Maximum number of results to retrieve"""
+        try:
+            query = {"user_id": user_id}
+            cursor = self.collection.find(query).sort("timestamp", -1)
+            
+            if limit:
+                cursor = cursor.limit(limit)
+            
+            results = []
+            for doc in cursor:
+                doc["_id"] = str(doc["_id"])  # Convert ObjectId to string
+                results.append(doc)
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error retrieving fact checks from database: {e}")
+            raise
+        
