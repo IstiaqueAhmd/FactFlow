@@ -249,13 +249,14 @@ async def upload_url(url: str, user_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
 
-@app.get("/get-results", response_model=List[ResponseModel])
+@app.get("/get-factchecks", response_model=List[ResponseModel])
 async def get_results(user_id: str, limit: Optional[int] = 10):
     """Retrieve past fact-check results for a given user."""
     try:
         results = database.get_fact_checks(user_id, limit)
         response = [
             ResponseModel(
+                uid=res["_id"],
                 user_id=res["user_id"],
                 verdict=res["verdict"],
                 confidence=res["confidence"],
@@ -269,6 +270,28 @@ async def get_results(user_id: str, limit: Optional[int] = 10):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving results: {str(e)}")
+
+
+@app.delete("/delete-factchecks/{uid}")
+async def delete_result(uid: str, user_id: str):
+    """Delete a specific fact-check result."""
+    try:
+        success = database.delete_fact_check(uid, user_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail="Fact check not found or you don't have permission to delete it"
+            )
+        
+        return {
+            "message": "Fact check deleted successfully",
+            "uid": uid
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting result: {str(e)}")
 
 
 
