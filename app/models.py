@@ -23,4 +23,5 @@ class CheckResponse(BaseModel):
 
 class ResponseModel(CheckResponse):
     """Extended response model that inherits from CheckResponse."""
+    uid: Optional[str] = Field(None, description="Unique identifier for the fact check")
     user_id: str = Field(..., description="Unique identifier for the user")
