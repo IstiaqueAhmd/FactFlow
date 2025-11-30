@@ -186,3 +186,4 @@ tmp/
 temp/
 .env
 app/__init__.py
+.env
