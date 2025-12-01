@@ -6,7 +6,7 @@ from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel, Source
+from models import TextRequest, ResponseModel, Source, URLRequest
 from factchecker import FactChecker
 
 # Define the directory to store uploaded files
@@ -219,21 +219,21 @@ async def upload_pdf(
 
 
 @app.post("/check-url", response_model=ResponseModel)
-async def upload_url(url: str, user_id: str):
+async def upload_url(request: URLRequest):
     """Fact-check the content of a given URL."""
     try:
-        if not url:
+        if not request.url:
             raise HTTPException(status_code=400, detail="Url cannot be empty")
         
         # Use FactChecker to analyze the text
-        result = fact_checker.check_url(url)
+        result = fact_checker.check_url(request.url)
         
         # Save to database
-        database.save_fact_check(user_id, result)
+        database.save_fact_check(request.user_id, result)
         
         # Return response with user_id
         response = ResponseModel(
-            user_id=user_id,
+            user_id=request.user_id,
             verdict=result.verdict,
             confidence=result.confidence,
             claim=result.claim,
