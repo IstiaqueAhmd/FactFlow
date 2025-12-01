@@ -7,6 +7,11 @@ class TextRequest(BaseModel):
     user_id: str = Field(..., description="Unique identifier for the user") 
     text: str = Field(..., min_length=1, description="Text to fact-check")
 
+class URLRequest(BaseModel):
+    """Request model for URL fact-checking."""
+    user_id: str = Field(..., description="Unique identifier for the user") 
+    url: str = Field(..., description="URL of the content to fact-check")
+
 class Source(BaseModel):
     """Model for a source reference."""
     title: str = Field(..., description="Title of the source")
