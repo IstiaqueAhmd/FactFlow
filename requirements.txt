@@ -8,3 +8,7 @@ psycopg2-binary==2.9.9
 sqlalchemy==2.0.23
 tavily-python
 PyPDF2
+#Authentication libraries
+python-jose[cryptography] 
+passlib[bcrypt] 
+python-multipart

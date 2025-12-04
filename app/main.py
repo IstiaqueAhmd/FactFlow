@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Annotated
 from datetime import datetime
@@ -8,6 +8,10 @@ from contextlib import asynccontextmanager
 from database import Database
 from models import TextRequest, ResponseModel, Source, URLRequest
 from factchecker import FactChecker
+from auth import verify_token, create_access_token
+from datetime import timedelta
+from dotenv import load_dotenv
+load_dotenv()
 
 # Define the directory to store uploaded files
 UPLOADS_PDF_DIR = "PDF_Uploads"
@@ -56,8 +60,18 @@ async def health_check():
     return {"status": "ok", "timestamp": datetime.utcnow()} 
 
 
+@app.post("/login")
+async def login(user_id: str):
+    """Generate JWT access token for a user."""
+    access_token = create_access_token(
+        data={"sub": user_id},
+        expires_delta=timedelta(minutes=30)
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @app.post("/check-text", response_model=ResponseModel)
-async def upload_text(request: TextRequest):
+async def upload_text(request: TextRequest, authenticated_user_id: str = Depends(verify_token)):
     """Fact-check the provided text."""
     try:
         if not request.text or not request.text.strip():
@@ -66,12 +80,12 @@ async def upload_text(request: TextRequest):
         # Use FactChecker to analyze the text
         result = fact_checker.check_text(request.text)
         
-        # Save to database
-        database.save_fact_check(request.user_id, result)
+        # Save to database with authenticated user_id
+        database.save_fact_check(authenticated_user_id, result)
         
-        # Return response with user_id
+        # Return response with authenticated user_id
         response = ResponseModel(
-            user_id=request.user_id,
+            user_id=authenticated_user_id,
             verdict=result.verdict,
             confidence=result.confidence,
             claim=result.claim,
@@ -91,7 +105,7 @@ async def upload_text(request: TextRequest):
 @app.post("/check-image", response_model=ResponseModel)
 async def upload_image(
     file: Annotated[UploadFile, File(description="The image file to upload (JPEG, PNG, GIF, WebP).")],
-    user_id: str
+    authenticated_user_id: str = Depends(verify_token)
 ):
     """
     Upload an image file and fact-check the text extracted from it.
@@ -130,12 +144,12 @@ async def upload_image(
     try:
         result = fact_checker.check_image(file_path)
         
-        # Save to database
-        database.save_fact_check(user_id, result)
+        # Save to database with authenticated user_id
+        database.save_fact_check(authenticated_user_id, result)
         
-        # Return response with user_id
+        # Return response with authenticated user_id
         response = ResponseModel(
-            user_id=user_id,
+            user_id=authenticated_user_id,
             verdict=result.verdict,
             confidence=result.confidence,
             claim=result.claim,
@@ -156,7 +170,7 @@ async def upload_image(
 @app.post("/check-pdf", response_model=ResponseModel)
 async def upload_pdf(
     file: Annotated[UploadFile, File(description="The PDF file to upload.")],
-    user_id: str
+    authenticated_user_id: str = Depends(verify_token)
 ):
     """
     Upload a PDF file and fact-check the text extracted from it.
@@ -195,12 +209,12 @@ async def upload_pdf(
     try:
         result = fact_checker.check_pdf(file_path)
         
-        # Save to database
-        database.save_fact_check(user_id, result)
+        # Save to database with authenticated user_id
+        database.save_fact_check(authenticated_user_id, result)
         
-        # Return response with user_id
+        # Return response with authenticated user_id
         response = ResponseModel(
-            user_id=user_id,
+            user_id=authenticated_user_id,
             verdict=result.verdict,
             confidence=result.confidence,
             claim=result.claim,
@@ -219,7 +233,7 @@ async def upload_pdf(
 
 
 @app.post("/check-url", response_model=ResponseModel)
-async def upload_url(request: URLRequest):
+async def upload_url(request: URLRequest, authenticated_user_id: str = Depends(verify_token)):
     """Fact-check the content of a given URL."""
     try:
         if not request.url:
@@ -228,12 +242,12 @@ async def upload_url(request: URLRequest):
         # Use FactChecker to analyze the text
         result = fact_checker.check_url(request.url)
         
-        # Save to database
-        database.save_fact_check(request.user_id, result)
+        # Save to database with authenticated user_id
+        database.save_fact_check(authenticated_user_id, result)
         
-        # Return response with user_id
+        # Return response with authenticated user_id
         response = ResponseModel(
-            user_id=request.user_id,
+            user_id=authenticated_user_id,
             verdict=result.verdict,
             confidence=result.confidence,
             claim=result.claim,
@@ -250,10 +264,10 @@ async def upload_url(request: URLRequest):
         raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
 
 @app.get("/get-factchecks", response_model=List[ResponseModel])
-async def get_results(user_id: str, limit: Optional[int] = 10):
-    """Retrieve past fact-check results for a given user."""
+async def get_results(authenticated_user_id: str = Depends(verify_token), limit: Optional[int] = 10):
+    """Retrieve past fact-check results for the authenticated user."""
     try:
-        results = database.get_fact_checks(user_id, limit)
+        results = database.get_fact_checks(authenticated_user_id, limit)
         response = [
             ResponseModel(
                 uid=res["_id"],
@@ -273,10 +287,10 @@ async def get_results(user_id: str, limit: Optional[int] = 10):
 
 
 @app.delete("/delete-factchecks/{uid}")
-async def delete_result(uid: str, user_id: str):
-    """Delete a specific fact-check result."""
+async def delete_result(uid: str, authenticated_user_id: str = Depends(verify_token)):
+    """Delete a specific fact-check result for the authenticated user."""
     try:
-        success = database.delete_fact_check(uid, user_id)
+        success = database.delete_fact_check(uid, authenticated_user_id)
         
         if not success:
             raise HTTPException(
@@ -297,4 +311,4 @@ async def delete_result(uid: str, user_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)
