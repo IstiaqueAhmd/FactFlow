@@ -63,7 +63,7 @@ class FactChecker:
                     "content": f"""You are an expert fact-checker. 
                     1. Use the search_web tool when you need to verify claims. 
                     2. Evaluate multiple sources. 
-                    3. Give a verdict (TRUE, FALSE, UNVERIFIABLE, ERROR). 
+                    3. Give a verdict (TRUE, FALSE, UNVERIFIABLE). 
                     4. Confidence (0.0–1.0).
                     5. Claim summary.
                     6. A brief Conclusion.
@@ -118,7 +118,7 @@ class FactChecker:
             
             # Final structured JSON output
             final_prompt = """Now summarize your findings in JSON with:
-            - verdict: TRUE, FALSE, UNVERIFIABLE, or ERROR
+            - verdict: TRUE, FALSE or UNVERIFIABLE
             - confidence: number 0.0–1.0
             - claim: the main claim being checked 
             - conclusion: 1–2 sentences
@@ -138,7 +138,7 @@ class FactChecker:
             sources = [Source(title=s.get("title", ""), url=s.get("url", "")) for s in result_data.get("sources", result_data.get("citations", []))]
             
             return CheckResponse(
-                verdict=result_data.get("verdict", "ERROR"),
+                verdict=result_data.get("verdict", "UNVERIFIABLE"),
                 confidence=float(result_data.get("confidence", 0.0)),
                 claim=result_data.get("claim", ""),
                 conclusion=result_data.get("conclusion", "Unable to verify"),
