@@ -8,6 +8,7 @@ from datetime import datetime
 from models import CheckResponse, Source
 import base64
 import PyPDF2
+from io import BytesIO
 
 load_dotenv()
 
@@ -159,31 +160,39 @@ class FactChecker:
                 timestamp=datetime.utcnow()
             )
 
-    def extract_text_from_image(self, image_path: str) -> str:
+    def extract_text_from_image(self, image_data) -> str:
         """
         Extract text from an image using GPT-4V vision capabilities.
         
         Args:
-            image_path: Path to the image file
+            image_data: Either bytes of the image or a file path (str)
             
         Returns:
             Extracted text from the image
         """
         try:
-            # Read and encode the image
-            with open(image_path, "rb") as image_file:
-                image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
+            # Handle both bytes and file paths
+            if isinstance(image_data, bytes):
+                image_bytes = image_data
+                # Default to JPEG if we can't determine format from bytes
+                mime_type = "image/jpeg"
+            else:
+                # Read from file path
+                with open(image_data, "rb") as image_file:
+                    image_bytes = image_file.read()
+                # Determine image format from file extension
+                file_ext = os.path.splitext(image_data)[1].lower()
+                mime_type_map = {
+                    ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg",
+                    ".png": "image/png",
+                    ".gif": "image/gif",
+                    ".webp": "image/webp"
+                }
+                mime_type = mime_type_map.get(file_ext, "image/jpeg")
             
-            # Determine image format from file extension
-            file_ext = os.path.splitext(image_path)[1].lower()
-            mime_type_map = {
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".png": "image/png",
-                ".gif": "image/gif",
-                ".webp": "image/webp"
-            }
-            mime_type = mime_type_map.get(file_ext, "image/jpeg")
+            # Encode image to base64
+            image_b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
             
             # Use GPT-4V to extract text
             response = self.openai_client.chat.completions.create(
@@ -199,7 +208,7 @@ class FactChecker:
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:{mime_type};base64,{image_data}"
+                                    "url": f"data:{mime_type};base64,{image_b64}"
                                 }
                             }
                         ]
@@ -216,12 +225,12 @@ class FactChecker:
             print(f"Error extracting text from image: {str(e)}")
             raise
 
-    def extract_text_from_pdf(self, pdf_path: str) -> str:
+    def extract_text_from_pdf(self, pdf_data) -> str:
         """
-        Extract text from a PDF file.
+        Extract text from a PDF file or bytes.
         
         Args:
-            pdf_path: Path to the PDF file
+            pdf_data: Either bytes of the PDF or a file path (str)
             
         Returns:
             Extracted text from the PDF
@@ -229,17 +238,26 @@ class FactChecker:
         try:
             extracted_text = ""
             
-            with open(pdf_path, "rb") as pdf_file:
-                pdf_reader = PyPDF2.PdfReader(pdf_file)
-                num_pages = len(pdf_reader.pages)
-                
-                print(f"📄 Extracting text from {num_pages} pages...")
-                
-                # Extract text from each page
-                for page_num in range(num_pages):
-                    page = pdf_reader.pages[page_num]
-                    extracted_text += page.extract_text()
-                    print(f"   Page {page_num + 1}/{num_pages} extracted")
+            # Handle both bytes and file paths
+            if isinstance(pdf_data, bytes):
+                pdf_file = BytesIO(pdf_data)
+            else:
+                pdf_file = open(pdf_data, "rb")
+            
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            num_pages = len(pdf_reader.pages)
+            
+            print(f"📄 Extracting text from {num_pages} pages...")
+            
+            # Extract text from each page
+            for page_num in range(num_pages):
+                page = pdf_reader.pages[page_num]
+                extracted_text += page.extract_text()
+                print(f"   Page {page_num + 1}/{num_pages} extracted")
+            
+            # Close file if it was opened from a path
+            if isinstance(pdf_data, str):
+                pdf_file.close()
             
             print(f"✅ Text extracted from PDF: {extracted_text[:100]}...")
             return extracted_text
@@ -248,19 +266,19 @@ class FactChecker:
             print(f"Error extracting text from PDF: {str(e)}")
             raise
 
-    def check_image(self, image_path: str) -> CheckResponse:
+    def check_image(self, image_data) -> CheckResponse:
         """
         Fact-check text extracted from an image.
         
         Args:
-            image_path: Path to the image file
+            image_data: Either bytes of the image or a file path (str)
             
         Returns:
             CheckResponse with fact-check verdict
         """
         try:
             # Extract text from the image
-            extracted_text = self.extract_text_from_image(image_path)
+            extracted_text = self.extract_text_from_image(image_data)
             
             if not extracted_text.strip():
                 return CheckResponse(
@@ -288,19 +306,19 @@ class FactChecker:
                 timestamp=datetime.utcnow()
             )
 
-    def check_pdf(self, pdf_path: str) -> CheckResponse:
+    def check_pdf(self, pdf_data) -> CheckResponse:
         """
         Fact-check text extracted from a PDF.
         
         Args:
-            pdf_path: Path to the PDF file
+            pdf_data: Either bytes of the PDF or a file path (str)
             
         Returns:
             CheckResponse with fact-check verdict
         """
         try:
             # Extract text from the PDF
-            extracted_text = self.extract_text_from_pdf(pdf_path)
+            extracted_text = self.extract_text_from_pdf(pdf_data)
             
             if not extracted_text.strip():
                 return CheckResponse(

@@ -128,25 +128,11 @@ async def upload_image(
             detail=f"Invalid file type. Allowed types are: {', '.join(ALLOWED_IMAGE_MIME_TYPES)}"
         )
 
-    # 2. Define the full path to save the file
-    file_path = os.path.join(UPLOADS_IMG_DIR, file.filename)
-
-    # 3. Save the file to the directory
+    # 2. Fact-check the image directly from uploaded file
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error saving the file: {str(e)}"
-        )
-    finally:
-        await file.close()
-
-    # 4. Fact-check the image
-    try:
-        result = fact_checker.check_image(file_path)
+        # Read file bytes into memory
+        file_bytes = await file.read()
+        result = fact_checker.check_image(file_bytes)
         
         # Save to database with authenticated user_id
         database.save_fact_check(authenticated_user_id, result)
@@ -196,25 +182,11 @@ async def upload_pdf(
             detail=f"Invalid file type. Allowed types are: PDF, DOC, DOCX, TXT"
         )
 
-    # 2. Define the full path to save the file
-    file_path = os.path.join(UPLOADS_PDF_DIR, file.filename)
-
-    # 3. Save the file to the directory
+    # 2. Fact-check the document directly from uploaded file
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error saving the file: {str(e)}"
-        )
-    finally:
-        await file.close()
-
-    # 4. Fact-check the PDF
-    try:
-        result = fact_checker.check_pdf(file_path)
+        # Read file bytes into memory
+        file_bytes = await file.read()
+        result = fact_checker.check_pdf(file_bytes)
         
         # Save to database with authenticated user_id
         database.save_fact_check(authenticated_user_id, result)
