@@ -17,8 +17,9 @@ load_dotenv()
 UPLOADS_PDF_DIR = "PDF_Uploads"
 UPLOADS_IMG_DIR = "Image_Uploads"
 
-# Define allowed image types
+# Define allowed types
 ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+ALLOWED_DOCUMENT_MIME_TYPES = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"]
 
 # Create the uploads directories if they don't already exist
 os.makedirs(UPLOADS_PDF_DIR, exist_ok=True)
@@ -118,7 +119,10 @@ async def upload_image(
     """
 
     # 1. Validate the file's content type
-    if file.content_type not in ALLOWED_IMAGE_MIME_TYPES:
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+    file_extension = os.path.splitext(file.filename)[1].lower()
+
+    if file.content_type not in ALLOWED_IMAGE_MIME_TYPES and file_extension not in allowed_extensions:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type. Allowed types are: {', '.join(ALLOWED_IMAGE_MIME_TYPES)}"
@@ -183,10 +187,13 @@ async def upload_pdf(
     """
 
     # 1. Validate the file's content type
-    if file.content_type != "application/pdf":
+    allowed_extensions = {".pdf", ".doc", ".docx", ".txt"}
+    file_extension = os.path.splitext(file.filename)[1].lower()
+
+    if file.content_type not in ALLOWED_DOCUMENT_MIME_TYPES and file_extension not in allowed_extensions:
         raise HTTPException(
             status_code=400,
-            detail="Invalid file type. Only PDF files (application/pdf) are allowed."
+            detail=f"Invalid file type. Allowed types are: PDF, DOC, DOCX, TXT"
         )
 
     # 2. Define the full path to save the file
