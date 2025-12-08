@@ -246,10 +246,20 @@ async def save_result(result: CheckResponse, authenticated_user_id: str = Depend
 
 
 @app.get("/get-factchecks", response_model=List[ResponseModel])
-async def get_results(authenticated_user_id: str = Depends(verify_token), limit: Optional[int] = 10):
-    """Retrieve past fact-check results for the authenticated user."""
+async def get_results(
+    authenticated_user_id: str = Depends(verify_token), 
+    limit: Optional[int] = 10,
+    verdict: Optional[str] = None
+):
+    """Retrieve past fact-check results for the authenticated user.
+    
+    Args:
+        authenticated_user_id: The authenticated user's ID
+        limit: Maximum number of results to return (default: 10)
+        verdict: Optional filter for verdict (e.g., "true", "false"). If empty, returns all fact-checks.
+    """
     try:
-        results = database.get_fact_checks(authenticated_user_id, limit)
+        results = database.get_fact_checks(authenticated_user_id, limit, verdict)
         response = [
             ResponseModel(
                 uid=res["_id"],
@@ -268,7 +278,7 @@ async def get_results(authenticated_user_id: str = Depends(verify_token), limit:
         raise HTTPException(status_code=500, detail=f"Error retrieving results: {str(e)}")
 
 
-@app.delete("/delete-factchecks/{uid}")
+@app.delete("/delete-factcheck")
 async def delete_result(uid: str, authenticated_user_id: str = Depends(verify_token)):
     """Delete a specific fact-check result for the authenticated user."""
     try:
