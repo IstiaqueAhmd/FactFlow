@@ -1,12 +1,12 @@
 import os
 import shutil
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel, Source, URLRequest
+from models import TextRequest, ResponseModel, Source, URLRequest, CheckResponse
 from factchecker import FactChecker
 from auth import verify_token, create_access_token
 from datetime import timedelta
@@ -81,9 +81,6 @@ async def upload_text(request: TextRequest, authenticated_user_id: str = Depends
         # Use FactChecker to analyze the text
         result = fact_checker.check_text(request.text)
         
-        # Save to database with authenticated user_id
-        database.save_fact_check(authenticated_user_id, result)
-        
         # Return response with authenticated user_id
         response = ResponseModel(
             user_id=authenticated_user_id,
@@ -133,9 +130,6 @@ async def upload_image(
         # Read file bytes into memory
         file_bytes = await file.read()
         result = fact_checker.check_image(file_bytes)
-        
-        # Save to database with authenticated user_id
-        database.save_fact_check(authenticated_user_id, result)
         
         # Return response with authenticated user_id
         response = ResponseModel(
@@ -188,9 +182,6 @@ async def upload_pdf(
         file_bytes = await file.read()
         result = fact_checker.check_pdf(file_bytes)
         
-        # Save to database with authenticated user_id
-        database.save_fact_check(authenticated_user_id, result)
-        
         # Return response with authenticated user_id
         response = ResponseModel(
             user_id=authenticated_user_id,
@@ -221,8 +212,6 @@ async def upload_url(request: URLRequest, authenticated_user_id: str = Depends(v
         # Use FactChecker to analyze the text
         result = fact_checker.check_url(request.url)
         
-        # Save to database with authenticated user_id
-        database.save_fact_check(authenticated_user_id, result)
         
         # Return response with authenticated user_id
         response = ResponseModel(
@@ -241,6 +230,20 @@ async def upload_url(request: URLRequest, authenticated_user_id: str = Depends(v
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking text: {str(e)}")
+
+
+@app.post("/save-factcheck")
+async def save_result(result: CheckResponse, authenticated_user_id: str = Depends(verify_token)):
+    """Save a fact-check result for the authenticated user."""
+    try:
+        uid = database.save_fact_check(authenticated_user_id, result)
+        return {
+            "message": "Fact check saved successfully",
+            "fact-check-id": uid
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving result: {str(e)}")
+
 
 @app.get("/get-factchecks", response_model=List[ResponseModel])
 async def get_results(authenticated_user_id: str = Depends(verify_token), limit: Optional[int] = 10):
