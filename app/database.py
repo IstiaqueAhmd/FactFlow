@@ -137,18 +137,25 @@ class Database:
         finally:
             session.close()
 
-    def get_fact_checks(self, user_id: str, limit: Optional[int] = None) -> List[Dict]:
+    def get_fact_checks(self, user_id: str, limit: Optional[int] = None, verdict: Optional[str] = None) -> List[Dict]:
         """
         Retrieve past fact check results for a given user.
         
         Args:
             user_id: The user ID whose results to retrieve
             limit: Maximum number of results to retrieve
+            verdict: Optional filter for verdict (e.g., "true", "false"). If None, returns all fact-checks.
         """
         session = self.get_session()
         try:
             # Query fact checks for the user, ordered by timestamp descending
-            query = session.query(FactCheck).filter(FactCheck.user_id == user_id).order_by(FactCheck.timestamp.desc())
+            query = session.query(FactCheck).filter(FactCheck.user_id == user_id)
+            
+            # Add verdict filter if provided
+            if verdict is not None and verdict.strip():
+                query = query.filter(FactCheck.verdict == verdict)
+            
+            query = query.order_by(FactCheck.timestamp.desc())
             
             if limit:
                 query = query.limit(limit)
