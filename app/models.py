@@ -16,7 +16,7 @@ class Source(BaseModel):
     url: str = Field(default="", description="URL of the source")
 
 class CheckResponse(BaseModel):
-    verdict: Literal["TRUE", "FALSE", "ERROR"] = Field(..., description="The verdict of the fact-check")
+    verdict: Literal["TRUE", "FALSE", "UNVERIFIABLE", "ERROR"] = Field(..., description="The verdict of the fact-check")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
     claim: str = Field(..., description="The main claim being checked")
     conclusion: str = Field(..., description="1-2 sentence conclusion")
