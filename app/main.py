@@ -6,7 +6,7 @@ from typing import List, Optional, Annotated
 from datetime import datetime
 from contextlib import asynccontextmanager
 from database import Database
-from models import TextRequest, ResponseModel, Source, URLRequest, CheckResponse
+from models import TextRequest, ResponseModel, Source, URLRequest, SaveResponse
 from factchecker import FactChecker
 from auth import verify_token, create_access_token
 from datetime import timedelta
@@ -233,7 +233,7 @@ async def upload_url(request: URLRequest, authenticated_user_id: str = Depends(v
 
 
 @app.post("/save-factcheck")
-async def save_result(result: CheckResponse, authenticated_user_id: str = Depends(verify_token)):
+async def save_result(result: SaveResponse, authenticated_user_id: str = Depends(verify_token)):
     """Save a fact-check result for the authenticated user."""
     try:
         uid = database.save_fact_check(authenticated_user_id, result)
