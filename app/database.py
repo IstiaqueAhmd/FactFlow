@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 import uuid
 from dotenv import load_dotenv
-from models import CheckResponse
+from models import SaveResponse
 
 # Load environment variables
 load_dotenv()
@@ -20,12 +20,12 @@ class FactCheck(Base):
     
     uid = Column(String(255), primary_key=True)
     user_id = Column(String(255), nullable=False, index=True)
-    verdict = Column(String(50), nullable=False, index=True)
-    confidence = Column(Float, nullable=False)
-    claim = Column(Text, nullable=False)
-    conclusion = Column(Text, nullable=False)
-    evidence = Column(JSON, nullable=False)
-    sources = Column(JSON, nullable=False)
+    verdict = Column(String(50), nullable=True, index=True)
+    confidence = Column(Float, nullable=True)
+    claim = Column(Text, nullable=True)
+    conclusion = Column(Text, nullable=True)
+    evidence = Column(JSON, nullable=True)
+    sources = Column(JSON, nullable=True)
     timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     
     # Create composite index for user_id and timestamp
@@ -93,13 +93,13 @@ class Database:
             self.connect()
         return self.SessionLocal()
     
-    def save_fact_check(self, user_id: str, check_result: CheckResponse) -> str:
+    def save_fact_check(self, user_id: str, check_result: SaveResponse) -> str:
         """
         Save a fact check result to the database.
         
         Args:
             user_id: The user ID who performed the fact check
-            check_result: The CheckResponse object containing the fact check results
+            check_result: The SaveResponse object containing the fact check results
             
         Returns:
             The inserted record ID as a string
@@ -108,6 +108,11 @@ class Database:
         try:
             # Generate unique ID
             fact_check_uid = str(uuid.uuid4())
+            
+            # Handle sources - convert to dict list if not None, otherwise set to None
+            sources_data = None
+            if check_result.sources is not None:
+                sources_data = [{"title": s.title, "url": s.url} for s in check_result.sources]
             
             # Create FactCheck record
             fact_check = FactCheck(
@@ -118,7 +123,7 @@ class Database:
                 claim=check_result.claim,
                 conclusion=check_result.conclusion,
                 evidence=check_result.evidence,
-                sources=[{"title": s.title, "url": s.url} for s in check_result.sources],
+                sources=sources_data,
                 timestamp=check_result.timestamp
             )
             
