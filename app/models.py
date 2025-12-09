@@ -29,3 +29,13 @@ class ResponseModel(CheckResponse):
     user_id: str = Field(..., description="Unique identifier for the user")
     uid: Optional[str] = Field(default=None, description="Unique identifier for the fact-check record (generated on save)")
 
+class SaveResponse(BaseModel):
+    """Model for saving fact-check results with optional fields to handle AI failures."""
+    verdict: Optional[Literal["TRUE", "FALSE", "UNVERIFIABLE", "ERROR"]] = Field(default=None, description="The verdict of the fact-check")
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
+    claim: Optional[str] = Field(default=None, description="The main claim being checked")
+    conclusion: Optional[str] = Field(default=None, description="1-2 sentence conclusion")
+    evidence: Optional[Dict[str, List[str]]] = Field(default=None, description="Supporting and counter evidence")
+    sources: Optional[List[Source]] = Field(default=None, description="Citations with title and URL")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Timestamp of the fact-check")
+
