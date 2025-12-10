@@ -61,14 +61,14 @@ async def health_check():
     return {"status": "ok", "timestamp": datetime.utcnow()} 
 
 
-@app.post("/login")
-async def login(user_id: str):
-    """Generate JWT access token for a user."""
-    access_token = create_access_token(
-        data={"sub": user_id},
-        expires_delta=timedelta(minutes=30)
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+# @app.post("/login")
+# async def login(user_id: str):
+#     """Generate JWT access token for a user."""
+#     access_token = create_access_token(
+#         data={"sub": user_id},
+#         expires_delta=timedelta(minutes=30)
+#     )
+#     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.post("/check-text", response_model=ResponseModel)
