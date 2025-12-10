@@ -30,7 +30,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     try:
         token = credentials.credentials
         payload = jwt.decode(token, JWT_ACCESS_SECRET, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+        user_id: str = payload.get("uid")
         
         if user_id is None:
             raise HTTPException(
